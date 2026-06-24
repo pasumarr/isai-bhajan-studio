@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# Database (large binary)
+backend/bhajans.db
+
+# Large JSON data (can be re-fetched)
+backend/mock_data/sai_rhythms.json
+
+# Temp/scratch files
+*.log
+.DS_Store
+Thumbs.db
+fetch.py
+fetch_and_inspect.py
+check_db.py
+song-search.js
