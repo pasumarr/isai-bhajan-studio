@@ -81,6 +81,32 @@ def init_db(db_path: str):
             END;
         """)
 
+        # --- Playlist tables ---
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS playlists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS playlist_bhajans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                playlist_id INTEGER NOT NULL,
+                bhajan_id INTEGER NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+                FOREIGN KEY (bhajan_id) REFERENCES bhajans(id) ON DELETE CASCADE,
+                CONSTRAINT unique_playlist_bhajan UNIQUE (playlist_id, bhajan_id)
+            );
+        """)
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_playlist_bhajans_playlist ON playlist_bhajans(playlist_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_playlist_bhajans_bhajan ON playlist_bhajans(bhajan_id);")
+
         conn.commit()
     except Exception as e:
         conn.rollback()
