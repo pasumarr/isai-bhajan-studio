@@ -199,6 +199,9 @@ function ExpandedRow({ bhajan }) {
     <tr className="expanded-row">
       <td colSpan="3">
         <div className="expanded-content">
+          <h3 className="expanded-title" style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "0.75rem", color: "rgba(255, 255, 255, 0.95)" }}>
+            {bhajan.title}
+          </h3>
           <div className="expanded-badges">
             {bhajan.deity && <span className="badge b-deity">{bhajan.deity}</span>}
             {bhajan.raga && <span className="badge b-raga">Raga: {bhajan.raga}</span>}
