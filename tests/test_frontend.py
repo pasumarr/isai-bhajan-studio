@@ -71,7 +71,7 @@ class MockNextjsHandler(BaseHTTPRequestHandler):
             try:
                 conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
-                cursor.execute("SELECT id, title, deity, raga, beat, lyrics, audio_url FROM bhajans")
+                cursor.execute("SELECT id, title, deity, raga, beat, lyrics, audio_url FROM bhajans ORDER BY title ASC")
                 rows = cursor.fetchall()
                 conn.close()
                 data = [

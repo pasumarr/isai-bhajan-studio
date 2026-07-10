@@ -205,14 +205,70 @@ def get_all_bhajans(db_path: str) -> list:
     finally:
         conn.close()
 
+def expand_query(q: str) -> str:
+    """Expands query to match common Sanskrit/Sai bhajan spelling/phonetic variants."""
+    if not q:
+        return ""
+    
+    words = q.strip().split()
+    if not words:
+        return ""
+        
+    expanded_words = []
+    
+    PHONETIC_VARIANTS = {
+        "shambo": ["shambho", "shambo"],
+        "shambho": ["shambo", "shambho"],
+        "shiva": ["siva", "shiva"],
+        "siva": ["shiva", "siva"],
+        "sathya": ["satya", "sathya"],
+        "satya": ["sathya", "satya"],
+        "ganesha": ["ganesa", "ganesha"],
+        "ganesa": ["ganesha", "ganesa"],
+        "he": ["hey", "he"],
+        "hey": ["he", "hey"],
+        "om": ["aum", "om"],
+        "aum": ["om", "aum"],
+        "murali": ["murli", "murali"],
+        "murli": ["murali", "murli"],
+        "dharma": ["darma", "dharma"],
+        "darma": ["dharma", "darma"],
+    }
+    
+    for w in words:
+        w_lower = w.lower()
+        if w_lower in ["and", "or", "not", "near", "*", "-"]:
+            expanded_words.append(w)
+            continue
+            
+        cleaned_w = w_lower.strip("\"'.,()[]{}!?;:")
+        if cleaned_w in PHONETIC_VARIANTS:
+            variants = PHONETIC_VARIANTS[cleaned_w]
+            expanded_w = "(" + " OR ".join(variants) + ")"
+            expanded_words.append(expanded_w)
+        else:
+            expanded_words.append(w)
+            
+    # Join terms with explicit AND if the query doesn't already contain operators
+    has_operator = any(op in [w.lower() for w in words] for op in ["and", "or", "not"])
+    if has_operator:
+        return " ".join(expanded_words)
+    else:
+        return " AND ".join(expanded_words)
+
 def search_bhajans(query: str, deity: str, raga: str, beat: str, 
-                   tempo: str, level: str, language: str, songtags: str,
-                   db_path: str) -> list:
+                   tempo: str = "", level: str = "", language: str = "", songtags: str = "",
+                   db_path: str = None) -> list:
     """
     Implements search combining FTS5 (for query matching title or lyrics) 
     and structured metadata filters (deity, raga, beat, tempo, level, language, songtags).
     Returns a list of dicts representing the matching bhajans.
     """
+    if db_path is None:
+        # Support legacy 5-argument calls: search_bhajans(query, deity, raga, beat, db_path)
+        db_path = tempo
+        tempo = ""
+
     conn = get_connection(db_path)
     cursor = conn.cursor()
 
@@ -258,7 +314,7 @@ def search_bhajans(query: str, deity: str, raga: str, beat: str,
     try:
         if cleaned_query:
             sql = "SELECT b.* FROM bhajans b JOIN bhajans_fts f ON b.id = f.rowid WHERE bhajans_fts MATCH ?"
-            params.append(cleaned_query)
+            params.append(expand_query(cleaned_query))
         else:
             sql = "SELECT b.* FROM bhajans b WHERE 1=1"
 

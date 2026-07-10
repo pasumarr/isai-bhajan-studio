@@ -16,7 +16,7 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
-from database import get_connection, init_db
+from database import get_connection, init_db, expand_query
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bhajans.db")
 
@@ -129,7 +129,7 @@ def search_bhajans(
         if q.strip():
             try:
                 sql = "SELECT b.* FROM bhajans b JOIN bhajans_fts f ON b.id = f.rowid WHERE bhajans_fts MATCH ?"
-                params.append(q.strip())
+                params.append(expand_query(q.strip()))
             except Exception:
                 sql = "SELECT b.* FROM bhajans b WHERE (b.title LIKE ? OR b.lyrics LIKE ?)"
                 like = f"%{q.strip()}%"
