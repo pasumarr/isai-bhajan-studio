@@ -199,9 +199,6 @@ function ExpandedRow({ bhajan }) {
     <tr className="expanded-row">
       <td colSpan="3">
         <div className="expanded-content">
-          <h3 className="expanded-title" style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "0.75rem", color: "rgba(255, 255, 255, 0.95)" }}>
-            {bhajan.title}
-          </h3>
           <div className="expanded-badges">
             {bhajan.deity && <span className="badge b-deity">{bhajan.deity}</span>}
             {bhajan.raga && <span className="badge b-raga">Raga: {bhajan.raga}</span>}
@@ -213,7 +210,7 @@ function ExpandedRow({ bhajan }) {
           <div className="expanded-split">
             <div className="expanded-lyrics">
               <h4>Lyrics</h4>
-              <pre>{bhajan.lyrics}</pre>
+              <pre>{bhajan.title}{"\n"}{bhajan.lyrics}</pre>
             </div>
             <div className="expanded-media">
               {embedUrl && (
