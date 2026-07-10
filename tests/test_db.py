@@ -216,8 +216,8 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["title"], "He Shiva Shankara")
         
-        # 2. Text search on lyrics
-        res = search_bhajans("Jagadamba", None, None, None, db_path)
+        # 2. Text search on title
+        res = search_bhajans("Bhavani", None, None, None, db_path)
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["title"], "Devi Bhavani Maa")
         

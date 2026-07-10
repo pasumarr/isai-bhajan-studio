@@ -131,9 +131,9 @@ def search_bhajans(
                 sql = "SELECT b.* FROM bhajans b JOIN bhajans_fts f ON b.id = f.rowid WHERE bhajans_fts MATCH ?"
                 params.append(expand_query(q.strip()))
             except Exception:
-                sql = "SELECT b.* FROM bhajans b WHERE (b.title LIKE ? OR b.lyrics LIKE ?)"
+                sql = "SELECT b.* FROM bhajans b WHERE b.title LIKE ?"
                 like = f"%{q.strip()}%"
-                params.extend([like, like])
+                params.append(like)
         else:
             sql = "SELECT b.* FROM bhajans b WHERE 1=1"
 

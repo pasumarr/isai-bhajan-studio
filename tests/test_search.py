@@ -51,13 +51,13 @@ class TestSearch(unittest.TestCase):
             self.assertEqual(r["beat"], "Adi")
 
     def test_search_by_lyrics_text(self):
-        """Tier 1: Verify full-text search works on lyrics"""
+        """Tier 1: Verify full-text search works on title"""
         first = query_search()[0]
-        word = first["lyrics"].split()[0]
+        word = first["title"].split()[0]
         results = query_search(query_str=word)
         self.assertGreaterEqual(len(results), 1)
         for r in results:
-            self.assertIn(word, r["lyrics"])
+            self.assertIn(word, r["title"])
 
     def test_search_multiple_filters(self):
         """Tier 1: Verify compound search using multiple filters combined"""
@@ -138,18 +138,18 @@ class TestSearch(unittest.TestCase):
             cursor.execute("""
                 INSERT INTO bhajans (title, deity, raga, beat, lyrics, audio_url)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, ("Sai Śiva Bhajan 100", "Shiva", "Bhairavi", "Adi", "Singing ॐ for Śiva", "https://example.com/siva.mp3"))
+            """, ("Sai Śiva Bhajan ॐ 100", "Shiva", "Bhairavi", "Adi", "Singing ॐ for Śiva", "https://example.com/siva.mp3"))
             conn.commit()
             
             # Verify searching by unicode works
             res = query_search(query_str="ॐ")
             self.assertEqual(len(res), 1)
-            self.assertEqual(res[0]["title"], "Sai Śiva Bhajan 100")
+            self.assertEqual(res[0]["title"], "Sai Śiva Bhajan ॐ 100")
             
             res_accent = query_search(query_str="Śiva")
             self.assertEqual(len(res_accent), 1)
         finally:
-            cursor.execute("DELETE FROM bhajans WHERE title = ?", ("Sai Śiva Bhajan 100",))
+            cursor.execute("DELETE FROM bhajans WHERE title = ?", ("Sai Śiva Bhajan ॐ 100",))
             conn.commit()
             conn.close()
 

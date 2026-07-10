@@ -277,9 +277,10 @@ def expand_query(q: str) -> str:
     # Join terms with explicit AND if the query doesn't already contain operators
     has_operator = any(op in [w.lower() for w in words] for op in ["and", "or", "not"])
     if has_operator:
-        return " ".join(expanded_words)
+        expr = " ".join(expanded_words)
     else:
-        return " AND ".join(expanded_words)
+        expr = " AND ".join(expanded_words)
+    return f"title : ({expr})"
 
 def search_bhajans(query: str, deity: str, raga: str, beat: str, 
                    tempo: str = "", level: str = "", language: str = "", songtags: str = "",
@@ -356,9 +357,9 @@ def search_bhajans(query: str, deity: str, raga: str, beat: str,
         sql = "SELECT b.* FROM bhajans b WHERE 1=1"
         
         if cleaned_query:
-            sql += " AND (b.title LIKE ? OR b.lyrics LIKE ?)"
+            sql += " AND b.title LIKE ?"
             like_pat = f"%{cleaned_query}%"
-            params.extend([like_pat, like_pat])
+            params.append(like_pat)
 
         sql = add_filters(sql)
         sql += " ORDER BY b.title ASC;"
