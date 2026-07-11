@@ -136,7 +136,7 @@ function SearchContent() {
                               {b.video_url && <span className="mi video" title="Video">▶</span>}
                             </span>
                           </td>
-                          <td className="col-actions">
+                          <td className="col-actions" onClick={(e) => e.stopPropagation()}>
                             <button className="play-btn" onClick={(e) => { e.stopPropagation(); playBhajan(b); }} title="Play">▶</button>
                           </td>
                         </tr>
@@ -186,6 +186,9 @@ function FilterSelect({ label, value, onChange, options }) {
 }
 
 function ExpandedRow({ bhajan }) {
+  const { currentBhajan, isPlaying, playBhajan, togglePlay } = usePlayer();
+  const isCurrent = currentBhajan?.id === bhajan.id;
+
   let embedUrl = "";
   if (bhajan.video_url) {
     try {
@@ -221,7 +224,26 @@ function ExpandedRow({ bhajan }) {
               {bhajan.audio_url && (
                 <div className="audio-wrap">
                   <h4>Audio</h4>
-                  <audio controls src={bhajan.audio_url} style={{ width: "100%" }} />
+                  <button
+                    onClick={() => isCurrent ? togglePlay() : playBhajan(bhajan)}
+                    style={{
+                      background: isCurrent && isPlaying ? "rgba(255, 87, 34, 0.15)" : "var(--accent, #ff5722)",
+                      color: isCurrent && isPlaying ? "var(--accent, #ff5722)" : "#fff",
+                      border: "1px solid var(--accent, #ff5722)",
+                      borderRadius: "8px",
+                      padding: "8px 16px",
+                      fontSize: "0.9rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontWeight: "600",
+                      transition: "all 0.2s",
+                      marginTop: "0.5rem"
+                    }}
+                  >
+                    <span>{isCurrent && isPlaying ? "⏸ Pause Audio" : "▶ Play Audio"}</span>
+                  </button>
                 </div>
               )}
             </div>
