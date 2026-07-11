@@ -62,6 +62,26 @@ def initialize_db(db_path):
             bhajan["lyrics"],
             bhajan["audio_url"]
         ))
+    # Seed mock embeddings for testing
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bhajan_embeddings (
+            bhajan_id INTEGER PRIMARY KEY,
+            embedding BLOB,
+            FOREIGN KEY (bhajan_id) REFERENCES bhajans (id) ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("SELECT id FROM bhajans")
+    ids = [row[0] for row in cursor.fetchall()]
+    import struct
+    import random
+    import math
+    for bhajan_id in ids:
+        vec = [random.gauss(0, 1) for _ in range(768)]
+        norm = math.sqrt(sum(x*x for x in vec))
+        embedding = [x / norm for x in vec]
+        blob = struct.pack("768f", *embedding)
+        cursor.execute("INSERT OR REPLACE INTO bhajan_embeddings (bhajan_id, embedding) VALUES (?, ?)", (bhajan_id, blob))
+
     conn.commit()
     conn.close()
 

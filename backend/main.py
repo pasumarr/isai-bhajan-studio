@@ -16,7 +16,7 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
-from database import get_connection, init_db, expand_query
+from database import get_connection, init_db, expand_query, search_semantic_bhajans
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bhajans.db")
 
@@ -107,6 +107,17 @@ def get_bhajan(bhajan_id: int):
 # ---------------------------------------------------------------------------
 # 3. GET /api/search — full-text + filter search with pagination
 # ---------------------------------------------------------------------------
+
+@app.get("/api/search/semantic")
+def semantic_search(
+    q: str = "",
+    limit: int = 10
+):
+    try:
+        results = search_semantic_bhajans(q, limit, DB_PATH)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/search")
 def search_bhajans(

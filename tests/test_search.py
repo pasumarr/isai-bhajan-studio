@@ -10,7 +10,7 @@ import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.mock_data import MOCK_BHAJANS, get_db_path, initialize_db
-from backend.database import search_bhajans
+from backend.database import search_bhajans, search_semantic_bhajans
 
 TEST_MODE = os.environ.get("TEST_MODE", "mock")
 
@@ -203,3 +203,22 @@ class TestSearch(unittest.TestCase):
             t.join()
             
         self.assertEqual(len(errors), 0, f"Concurrent search errors: {errors}")
+
+    def test_search_semantic_basic(self):
+        """Test happy path for semantic search on mock database"""
+        db_path = get_db_path()
+        initialize_db(db_path)
+        
+        results = search_semantic_bhajans("peaceful morning song", limit=5, db_path=db_path)
+        self.assertEqual(len(results), 5)
+        for r in results:
+            self.assertIn("ai_score", r)
+            self.assertTrue(-1.0 <= r["ai_score"] <= 1.0)
+            self.assertIn("title", r)
+            self.assertIn("lyrics", r)
+
+    def test_search_semantic_empty(self):
+        """Test semantic search with empty query"""
+        db_path = get_db_path()
+        results = search_semantic_bhajans("", limit=5, db_path=db_path)
+        self.assertEqual(len(results), 0)

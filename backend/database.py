@@ -1,6 +1,8 @@
 import sqlite3
 import os
 import logging
+import struct
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
@@ -371,5 +373,86 @@ def search_bhajans(query: str, deity: str, raga: str, beat: str,
         except Exception as ex:
             logger.error(f"Fallback search also failed: {ex}")
             return []
+    finally:
+        conn.close()
+
+def search_semantic_bhajans(query: str, limit: int = 10, db_path: str = None) -> list:
+    """Performs semantic search on bhajans using Gemini vector embeddings."""
+    if not query:
+        return []
+
+    # Get query embedding
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        # Mock mode fallback: generate a random normalized vector
+        logger.warning("GEMINI_API_KEY is not set. Generating mock query vector for testing.")
+        import random
+        import math
+        vec = [random.gauss(0, 1) for _ in range(768)]
+        norm = math.sqrt(sum(x*x for x in vec))
+        query_vector = [x / norm for x in vec]
+    else:
+        try:
+            genai.configure(api_key=api_key)
+            response = genai.embed_content(
+                model="models/text-embedding-004",
+                content=query,
+                task_type="retrieval_query"
+            )
+            query_vector = response.get("embedding")
+        except Exception as e:
+            logger.error(f"Error calling Gemini Embedding API: {e}")
+            return []
+
+    if not query_vector:
+        return []
+
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        # Fetch all bhajan IDs and their embedding blobs
+        cursor.execute("SELECT bhajan_id, embedding FROM bhajan_embeddings")
+        rows = cursor.fetchall()
+        
+        similarities = []
+        
+        for bhajan_id, blob in rows:
+            if not blob:
+                continue
+            # Unpack float list from BLOB (768 floats)
+            num_floats = len(blob) // 4
+            vector = list(struct.unpack(f"{num_floats}f", blob))
+            
+            # Since vectors are normalized, dot product = cosine similarity
+            if len(vector) == len(query_vector):
+                sim = sum(x * y for x, y in zip(vector, query_vector))
+                similarities.append((bhajan_id, sim))
+                
+        # Sort by similarity descending
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        top_matches = similarities[:limit]
+        
+        if not top_matches:
+            return []
+            
+        # Fetch actual bhajan rows for the top match IDs
+        ids_placeholder = ",".join("?" for _ in top_matches)
+        cursor.execute(f"SELECT * FROM bhajans WHERE id IN ({ids_placeholder})", [t[0] for t in top_matches])
+        bhajans_by_id = {row["id"]: dict(row) for row in cursor.fetchall()}
+        
+        # Preserve sorted order of matches
+        sorted_results = []
+        for bhajan_id, score in top_matches:
+            if bhajan_id in bhajans_by_id:
+                bhajan_data = bhajans_by_id[bhajan_id]
+                bhajan_data["ai_score"] = float(score)
+                sorted_results.append(bhajan_data)
+                
+        return sorted_results
+        
+    except Exception as e:
+        logger.error(f"Error in search_semantic_bhajans: {e}")
+        return []
     finally:
         conn.close()

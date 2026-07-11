@@ -22,6 +22,8 @@ function SearchContent() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(true);
+  const [searchMode, setSearchMode] = useState("standard");
+  const [aiQuery, setAiQuery] = useState("");
 
   // Load filter options
   useEffect(() => {
@@ -54,7 +56,14 @@ function SearchContent() {
   );
 
   // Initial search
-  useEffect(() => { doSearch(1); }, []);
+  useEffect(() => {
+    if (searchMode === "standard") {
+      doSearch(1);
+    } else {
+      setResults(null);
+      setExpandedRow(null);
+    }
+  }, [searchMode, doSearch]);
 
   const handleSubmit = (e) => { e.preventDefault(); doSearch(1); };
   const handleReset = () => {
@@ -66,18 +75,74 @@ function SearchContent() {
     }, 0);
   };
 
+  const handleAiSubmit = useCallback((e) => {
+    if (e) e.preventDefault();
+    if (!aiQuery.trim()) return;
+    setLoading(true);
+    fetch(`${API_BASE}/api/search/semantic?q=${encodeURIComponent(aiQuery.trim())}&limit=25`)
+      .then((r) => r.json())
+      .then((data) => {
+        setResults({
+          total: data.results.length,
+          page: 1,
+          total_pages: 1,
+          limit: 25,
+          results: data.results
+        });
+        setExpandedRow(null);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [aiQuery]);
+
   return (
     <div className="search-page">
       <h1 className="page-title">Search Bhajans</h1>
 
+      {/* Search Mode Tabs */}
+      <div className="search-mode-tabs" style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
+        <button 
+          onClick={() => setSearchMode("standard")} 
+          style={{
+            background: searchMode === "standard" ? "var(--accent, #ff5722)" : "rgba(255, 255, 255, 0.05)",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            padding: "8px 16px",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+        >
+          🔍 Standard Search
+        </button>
+        <button 
+          onClick={() => setSearchMode("ai")} 
+          style={{
+            background: searchMode === "ai" ? "linear-gradient(135deg, var(--accent, #ff5722), #2196f3)" : "rgba(255, 255, 255, 0.05)",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            padding: "8px 16px",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: searchMode === "ai" ? "0 4px 15px rgba(33, 150, 243, 0.3)" : "none"
+          }}
+        >
+          ✨ AI Semantic Search
+        </button>
+      </div>
+
       <div className="search-layout">
-        {/* Filter Panel */}
-        <div className={`filter-panel ${showFilters ? "open" : "collapsed"}`}>
-          <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
-            {showFilters ? "▾ Hide Filters" : "▸ Show Filters"}
-          </button>
-          {showFilters && (
-            <form onSubmit={handleSubmit} className="filter-form">
+        {/* Standard Filter Panel */}
+        {searchMode === "standard" && (
+          <div className={`filter-panel ${showFilters ? "open" : "collapsed"}`}>
+            <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
+              {showFilters ? "▾ Hide Filters" : "▸ Show Filters"}
+            </button>
+            {showFilters && (
+              <form onSubmit={handleSubmit} className="filter-form">
               <div className="filter-group full">
                 <label>Lyrics / Title</label>
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="filter-input" />
@@ -105,6 +170,45 @@ function SearchContent() {
             </form>
           )}
         </div>
+        )}
+
+        {/* AI Prompt Panel */}
+        {searchMode === "ai" && (
+          <div className={`filter-panel ${showFilters ? "open" : "collapsed"}`}>
+            <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
+              {showFilters ? "▾ Hide AI Search" : "▸ Show AI Search"}
+            </button>
+            {showFilters && (
+              <form onSubmit={handleAiSubmit} className="filter-form">
+                <div className="filter-group full">
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>✨ Ask the AI Assistant</span>
+                  </label>
+                  <textarea 
+                    value={aiQuery} 
+                    onChange={(e) => setAiQuery(e.target.value)} 
+                    placeholder="Describe the bhajan, mood, raga, or story (e.g. 'peaceful morning Shiva song' or 'Krishna song with Yamuna river')..." 
+                    className="filter-input" 
+                    rows="5"
+                    style={{ resize: "none", width: "100%", padding: "10px", borderRadius: "8px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                  />
+                </div>
+                <div className="filter-actions">
+                  <button type="button" onClick={() => setAiQuery("")} className="btn-reset">Clear</button>
+                  <button type="submit" className="btn-search" style={{
+                    background: "linear-gradient(135deg, var(--accent, #ff5722), #2196f3)",
+                    boxShadow: "0 4px 15px rgba(33, 150, 243, 0.25)",
+                    border: "none",
+                    color: "#fff",
+                    cursor: "pointer"
+                  }}>
+                    ✨ Search
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
 
         {/* Results */}
         <div className="results-panel">
