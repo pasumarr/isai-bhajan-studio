@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: isai-bhajan-studio-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    # Render's free tier
+    plan: free
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false   # You set this manually in Render dashboard (secret)
+    healthCheckPath: /api/stats
+    # Build from the repo root so Docker COPY can reach bhajans.db
+    rootDir: .
