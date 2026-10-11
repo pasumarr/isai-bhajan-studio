@@ -3,6 +3,9 @@ ISai Bhajan Studio — Mark 2 FastAPI Backend
 Provides REST API endpoints for bhajan search, playlists, stats, and filters.
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import sqlite3
 import math
@@ -108,14 +111,37 @@ def get_bhajan(bhajan_id: int):
 # 3. GET /api/search — full-text + filter search with pagination
 # ---------------------------------------------------------------------------
 
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from ai_parser import parse_search_intent
+
 @app.get("/api/search/semantic")
 def semantic_search(
     q: str = "",
-    limit: int = 10
+    limit: int = 10,
+    parse_intent: bool = False
 ):
     try:
-        results = search_semantic_bhajans(q, limit, DB_PATH)
-        return {"results": results}
+        if parse_intent and q:
+            intent = parse_search_intent(q)
+            filters = {}
+            if intent.get("tempo"):
+                filters["tempo"] = intent["tempo"]
+            if intent.get("deity"):
+                filters["deity"] = intent["deity"]
+            if intent.get("ragas"):
+                filters["ragas"] = intent["ragas"]
+            
+            # Use semantic query from intent if available, fallback to original query
+            semantic_q = intent.get("semantic_query", q)
+            if not semantic_q.strip():
+                semantic_q = q
+                
+            results = search_semantic_bhajans(semantic_q, limit, DB_PATH, filters)
+            return {"intent_parsed": intent, "results": results}
+        else:
+            results = search_semantic_bhajans(q, limit, DB_PATH)
+            return {"results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

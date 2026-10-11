@@ -2,7 +2,7 @@ import sqlite3
 import os
 import logging
 import struct
-import google.generativeai as genai
+from google import genai
 
 logger = logging.getLogger(__name__)
 
@@ -376,10 +376,13 @@ def search_bhajans(query: str, deity: str, raga: str, beat: str,
     finally:
         conn.close()
 
-def search_semantic_bhajans(query: str, limit: int = 10, db_path: str = None) -> list:
+def search_semantic_bhajans(query: str, limit: int = 10, db_path: str = None, filters: dict = None) -> list:
     """Performs semantic search on bhajans using Gemini vector embeddings."""
     if not query:
         return []
+        
+    if filters is None:
+        filters = {}
 
     # Get query embedding
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -393,13 +396,12 @@ def search_semantic_bhajans(query: str, limit: int = 10, db_path: str = None) ->
         query_vector = [x / norm for x in vec]
     else:
         try:
-            genai.configure(api_key=api_key)
-            response = genai.embed_content(
-                model="models/text-embedding-004",
-                content=query,
-                task_type="retrieval_query"
+            client = genai.Client(api_key=api_key)
+            response = client.models.embed_content(
+                model="gemini-embedding-001",
+                contents=query,
             )
-            query_vector = response.get("embedding")
+            query_vector = response.embeddings[0].values
         except Exception as e:
             logger.error(f"Error calling Gemini Embedding API: {e}")
             return []
@@ -411,8 +413,35 @@ def search_semantic_bhajans(query: str, limit: int = 10, db_path: str = None) ->
     cursor = conn.cursor()
     
     try:
-        # Fetch all bhajan IDs and their embedding blobs
-        cursor.execute("SELECT bhajan_id, embedding FROM bhajan_embeddings")
+        # Build filter query for bhajans
+        filter_sql = "SELECT id FROM bhajans WHERE 1=1"
+        params = []
+        
+        tempo = filters.get("tempo", "").strip()
+        deity = filters.get("deity", "").strip()
+        ragas = filters.get("ragas", [])
+        
+        if tempo:
+            filter_sql += " AND tempo LIKE ? COLLATE NOCASE"
+            params.append(f"%{tempo}%")
+        if deity:
+            filter_sql += " AND deity LIKE ? COLLATE NOCASE"
+            params.append(f"%{deity}%")
+        if ragas:
+            raga_clauses = " OR ".join(["raga LIKE ? COLLATE NOCASE"] * len(ragas))
+            filter_sql += f" AND ({raga_clauses})"
+            for r in ragas:
+                params.append(f"%{r.strip()}%")
+            
+        cursor.execute(filter_sql, params)
+        valid_ids = {row["id"] for row in cursor.fetchall()}
+        
+        if not valid_ids:
+            return []
+            
+        # Fetch embeddings only for valid_ids
+        ids_placeholder = ",".join("?" for _ in valid_ids)
+        cursor.execute(f"SELECT bhajan_id, embedding FROM bhajan_embeddings WHERE bhajan_id IN ({ids_placeholder})", list(valid_ids))
         rows = cursor.fetchall()
         
         similarities = []

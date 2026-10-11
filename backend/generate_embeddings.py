@@ -3,7 +3,9 @@ import sys
 import sqlite3
 import struct
 import time
-import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bhajans.db")
 
@@ -19,13 +21,14 @@ def init_embedding_table(conn):
     conn.commit()
 
 def generate_embeddings():
-    # Check for --mock flag
+    # Check for flags
     mock_mode = "--mock" in sys.argv
+    regenerate = "--regenerate" in sys.argv
 
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         if mock_mode:
-            print("Notice: GEMINI_API_KEY is not set. Running in MOCK mode (generating random 768-dim vectors).")
+            print("Notice: GEMINI_API_KEY is not set. Running in MOCK mode (generating random 3072-dim vectors).")
         else:
             print("ERROR: GEMINI_API_KEY environment variable is not set.")
             print("To test the pipeline without an API key, run with the --mock flag:")
@@ -33,13 +36,20 @@ def generate_embeddings():
             print("\nOtherwise, please run: export GEMINI_API_KEY='your-key'")
             sys.exit(1)
     else:
-        genai.configure(api_key=api_key)
+        from google import genai
+        client = genai.Client(api_key=api_key)
 
     conn = sqlite3.connect(DB_PATH)
     init_embedding_table(conn)
+    cursor = conn.cursor()
+
+    # If regenerating, clear all old embeddings first
+    if regenerate:
+        print("Regenerating all embeddings (clearing old ones)...")
+        cursor.execute("DELETE FROM bhajan_embeddings")
+        conn.commit()
 
     # Fetch all bhajans that don't have embeddings yet
-    cursor = conn.cursor()
     cursor.execute("""
         SELECT b.id, b.title, b.deity, b.raga, b.lyrics 
         FROM bhajans b
@@ -56,57 +66,65 @@ def generate_embeddings():
 
     print(f"Found {total_to_embed} bhajans to embed. Starting generation...")
 
+    # Process in batches for efficiency
+    BATCH_SIZE = 20
     count = 0
     start_time = time.time()
 
-    for row in rows:
-        bhajan_id, title, deity, raga, lyrics = row
+    for batch_start in range(0, len(rows), BATCH_SIZE):
+        batch = rows[batch_start:batch_start + BATCH_SIZE]
         
-        # Prepare text representation for semantic embedding
-        text_to_embed = f"Title: {title or ''} | Deity: {deity or ''} | Raga: {raga or ''} | Lyrics: {lyrics or ''}"
+        texts = []
+        ids = []
+        for row in batch:
+            bhajan_id, title, deity, raga, lyrics = row
+            text_to_embed = f"Title: {title or ''} | Deity: {deity or ''} | Raga: {raga or ''} | Lyrics: {lyrics or ''}"
+            texts.append(text_to_embed)
+            ids.append(bhajan_id)
         
         try:
             if not api_key and mock_mode:
-                # Generate a mock 768-dim normalized vector
+                # Generate mock 3072-dim normalized vectors
                 import random
                 import math
-                vec = [random.gauss(0, 1) for _ in range(768)]
-                norm = math.sqrt(sum(x*x for x in vec))
-                embedding = [x / norm for x in vec]
+                embeddings = []
+                for _ in texts:
+                    vec = [random.gauss(0, 1) for _ in range(3072)]
+                    norm = math.sqrt(sum(x*x for x in vec))
+                    embeddings.append([x / norm for x in vec])
             else:
-                # Generate embedding vector (768 dimensions for models/text-embedding-004)
-                response = genai.embed_content(
-                    model="models/text-embedding-004",
-                    content=text_to_embed,
-                    task_type="retrieval_document"
+                # Batch embed using new SDK
+                response = client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=texts,
                 )
-                embedding = response.get("embedding")
+                embeddings = [e.values for e in response.embeddings]
                 
-            if not embedding:
-                print(f"Warning: No embedding returned for bhajan ID {bhajan_id}")
-                continue
+            for i, embedding in enumerate(embeddings):
+                if not embedding:
+                    print(f"Warning: No embedding returned for bhajan ID {ids[i]}")
+                    continue
+                    
+                # Pack float list to binary BLOB
+                embedding_blob = struct.pack(f"{len(embedding)}f", *embedding)
                 
-            # Pack float list to binary BLOB (768 floats * 4 bytes = 3072 bytes)
-            embedding_blob = struct.pack(f"{len(embedding)}f", *embedding)
+                cursor.execute(
+                    "INSERT OR REPLACE INTO bhajan_embeddings (bhajan_id, embedding) VALUES (?, ?)",
+                    (ids[i], embedding_blob)
+                )
+                count += 1
             
-            cursor.execute(
-                "INSERT INTO bhajan_embeddings (bhajan_id, embedding) VALUES (?, ?)",
-                (bhajan_id, embedding_blob)
-            )
-            
-            count += 1
-            if count % 50 == 0 or count == total_to_embed:
-                conn.commit()
-                elapsed = time.time() - start_time
-                rate = count / elapsed if elapsed > 0 else 0
-                print(f"Embedded {count}/{total_to_embed} bhajans ({rate:.2f} songs/sec)...")
+            conn.commit()
+            elapsed = time.time() - start_time
+            rate = count / elapsed if elapsed > 0 else 0
+            print(f"Embedded {count}/{total_to_embed} bhajans ({rate:.1f} songs/sec)...")
                 
-            # Respect rate limits (1500 RPM for free tier Gemini API)
+            # Respect rate limits
             if not mock_mode:
-                time.sleep(0.05)
+                time.sleep(0.1)
             
         except Exception as e:
-            print(f"Error embedding bhajan ID {bhajan_id}: {e}")
+            print(f"Error embedding batch starting at ID {ids[0]}: {e}")
             print("Stopping. Progress is saved.")
             conn.commit()
             conn.close()
@@ -118,3 +136,4 @@ def generate_embeddings():
 
 if __name__ == "__main__":
     generate_embeddings()
+
