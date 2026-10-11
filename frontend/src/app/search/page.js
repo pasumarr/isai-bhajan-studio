@@ -2,11 +2,15 @@
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePlayer } from "../context/PlayerContext";
+import { useAuth } from "../context/AuthContext";
+import { useFavorites } from "../context/FavoritesContext";
 import API_BASE from "../utils/api";
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const { playBhajan } = usePlayer();
+  const { user } = useAuth();
+  const { toggleFavorite, isFavorite } = useFavorites();
 
   const [filters, setFilters] = useState(null);
   const [query, setQuery] = useState("");
@@ -79,7 +83,7 @@ function SearchContent() {
     if (e) e.preventDefault();
     if (!aiQuery.trim()) return;
     setLoading(true);
-    fetch(`${API_BASE}/api/search/semantic?q=${encodeURIComponent(aiQuery.trim())}&limit=25`)
+    fetch(`${API_BASE}/api/search/semantic?q=${encodeURIComponent(aiQuery.trim())}&limit=25&parse_intent=true`)
       .then((r) => r.json())
       .then((data) => {
         setResults({
@@ -226,7 +230,7 @@ function SearchContent() {
               <div className="results-table-wrap">
                 <table className="results-table">
                   <thead>
-                    <tr><th className="col-no">No.</th><th>Song Title</th><th className="col-actions">Play</th></tr>
+                    <tr><th className="col-no">No.</th><th>Song Title</th><th className="col-actions">Play</th><th className="col-actions">❤️</th></tr>
                   </thead>
                   <tbody>
                     {results.results.map((b, i) => (
@@ -242,6 +246,24 @@ function SearchContent() {
                           </td>
                           <td className="col-actions" onClick={(e) => e.stopPropagation()}>
                             <button className="play-btn" onClick={(e) => { e.stopPropagation(); playBhajan(b); }} title="Play">▶</button>
+                          </td>
+                          <td className="col-actions" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); user ? toggleFavorite(b) : null; }}
+                              title={user ? (isFavorite(b.id) ? "Remove from favourites" : "Add to favourites") : "Sign in to favourite"}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                fontSize: "1.1rem",
+                                cursor: user ? "pointer" : "default",
+                                opacity: user ? 1 : 0.35,
+                                padding: "4px 6px",
+                                transition: "transform 0.15s",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {isFavorite(b.id) ? "❤️" : "🤍"}
+                            </button>
                           </td>
                         </tr>
                         {expandedRow === b.id && <ExpandedRow bhajan={b} />}
@@ -291,7 +313,10 @@ function FilterSelect({ label, value, onChange, options }) {
 
 function ExpandedRow({ bhajan }) {
   const { currentBhajan, isPlaying, playBhajan, togglePlay } = usePlayer();
+  const { user } = useAuth();
+  const { toggleFavorite, isFavorite } = useFavorites();
   const isCurrent = currentBhajan?.id === bhajan.id;
+  const favorited = isFavorite(bhajan.id);
 
   let embedUrl = "";
   if (bhajan.video_url) {
@@ -313,6 +338,28 @@ function ExpandedRow({ bhajan }) {
             {bhajan.tempo && <span className="badge b-tempo">Tempo: {bhajan.tempo}</span>}
             {bhajan.level && <span className="badge b-level">{bhajan.level}</span>}
             {bhajan.language && <span className="badge b-lang">{bhajan.language}</span>}
+            <button
+              onClick={() => user ? toggleFavorite(bhajan) : null}
+              title={user ? (favorited ? "Remove from favourites" : "Add to favourites") : "Sign in to save favourites"}
+              style={{
+                background: favorited ? "rgba(255, 80, 100, 0.15)" : "rgba(255,255,255,0.07)",
+                border: favorited ? "1px solid rgba(255,80,100,0.4)" : "1px solid rgba(255,255,255,0.15)",
+                borderRadius: "20px",
+                padding: "4px 14px",
+                fontSize: "0.9rem",
+                cursor: user ? "pointer" : "default",
+                color: favorited ? "#ff6b8a" : "rgba(255,255,255,0.7)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontWeight: "600",
+                transition: "all 0.2s",
+                opacity: user ? 1 : 0.45,
+              }}
+            >
+              {favorited ? "❤️ Saved" : "🤍 Save"}
+              {!user && <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>(sign in)</span>}
+            </button>
           </div>
           <div className="expanded-split">
             <div className="expanded-lyrics">

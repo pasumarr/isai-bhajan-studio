@@ -1,6 +1,8 @@
 "use client";
 import { PlayerProvider } from "./context/PlayerContext";
 import AppShell from "./components/AppShell";
+import { AuthProvider } from "./context/AuthContext";
+import { FavoritesProvider } from "./context/FavoritesContext";
 import "./globals.css";
 
 export default function RootLayout({ children }) {
@@ -11,9 +13,13 @@ export default function RootLayout({ children }) {
         <meta name="description" content="Discover thousands of divine Sai bhajans with lyrics, audio, and video." />
       </head>
       <body>
-        <PlayerProvider>
-          <AppShell>{children}</AppShell>
-        </PlayerProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <PlayerProvider>
+              <AppShell>{children}</AppShell>
+            </PlayerProvider>
+          </FavoritesProvider>
+        </AuthProvider>
       </body>
     </html>
   );
